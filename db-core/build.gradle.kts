@@ -3,7 +3,7 @@ apply(plugin = "com.vanniktech.maven.publish")
 description = "Cluster-based MyBatis configuration, HikariCP-backed connection pooling, and idempotent schema bootstrap per named database, on top of LSS02ConfigurationLib."
 
 dependencies {
-    api("io.github.littleshystar02:config-core:0.1.0-SNAPSHOT")
+    api("io.github.littleshystar02:config-core:0.1.0")
     api("org.mybatis:mybatis:3.5.19")
     implementation("com.zaxxer:HikariCP:6.3.0")
 
