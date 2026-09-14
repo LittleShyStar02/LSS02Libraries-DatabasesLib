@@ -1,0 +1,52 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+.kotlin/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+# Eclipse
+.classpath
+.project
+.settings/
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+# VS Code
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# JVM/log/temp
+*.log
+*.tmp
+hs_err_pid*.log
+replay_pid*.log
+
+# Claude Code locale (non versionato, coerente con le altre repo dell'utente)
+.claude/
+CLAUDE.md
+
+# Sito docs: repo git indipendente e separata, non va tracciata qui
+/docs/
+
+# Chiavi/segreti (GPG signing, ecc.) - non vanno mai tracciate
+*.asc
+*.gpg
+*.pem
+private-key*
+secring.gpg
