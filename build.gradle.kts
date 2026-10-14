@@ -71,8 +71,8 @@ subprojects {
 
                 licenses {
                     license {
-                        name.set("PolyForm Noncommercial License 1.0.0")
-                        url.set("https://polyformproject.org/licenses/noncommercial/1.0.0")
+                        name.set("GNU General Public License v3.0")
+                        url.set("https://www.gnu.org/licenses/gpl-3.0.html")
                     }
                 }
 
