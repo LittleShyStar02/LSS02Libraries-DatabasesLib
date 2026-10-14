@@ -121,8 +121,8 @@ Neither module bundles a JDBC driver. Add the one you need — `mysql-connector-
 
 ```kotlin
 dependencies {
-    implementation("io.github.littleshystar02:db-core:0.1.2")
-    implementation("io.github.littleshystar02:db-migration:0.1.2") // only if you need cross-database migration
+    implementation("io.github.littleshystar02:db-core:0.1.3")
+    implementation("io.github.littleshystar02:db-migration:0.1.3") // only if you need cross-database migration
     runtimeOnly("com.mysql:mysql-connector-j:9.3.0") // whichever drivers your cluster actually uses
 }
 ```
