@@ -11,6 +11,7 @@ import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 
 import javax.sql.DataSource;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -23,16 +24,47 @@ public class DatabaseCluster implements AutoCloseable {
     private final Map<String, SqlSessionFactory> sessionFactories = new LinkedHashMap<>();
 
     public DatabaseCluster(DatabaseClusterConfiguration configuration) {
-        this.definitions = ClusterLoader.load(configuration);
-        for (DatabaseDefinition definition : definitions.values()) {
-            HikariDataSource dataSource = DataSourceFactory.create(definition);
-            dataSources.put(definition.getName(), dataSource);
+        this(configuration, null);
+    }
 
-            if (definition.getSetupScript() != null || definition.getVersionedScriptsPath() != null) {
-                SchemaBootstrapper.bootstrap(dataSource, definition.getSetupScript(), definition.getVersionedScriptsPath());
+    public DatabaseCluster(DatabaseClusterConfiguration configuration, ClassLoader classLoader) {
+        this(ClusterLoader.load(configuration), classLoader);
+    }
+
+    public DatabaseCluster(Collection<DatabaseDefinition> definitions) {
+        this(definitions, null);
+    }
+
+    public DatabaseCluster(Collection<DatabaseDefinition> definitions, ClassLoader classLoader) {
+        this(indexByName(definitions), classLoader);
+    }
+
+    private DatabaseCluster(Map<String, DatabaseDefinition> definitions, ClassLoader classLoader) {
+        this.definitions = definitions;
+        Thread thread = Thread.currentThread();
+        ClassLoader previous = thread.getContextClassLoader();
+        if (classLoader != null) {
+            thread.setContextClassLoader(classLoader);
+        }
+        try {
+            for (DatabaseDefinition definition : definitions.values()) {
+                HikariDataSource dataSource = DataSourceFactory.create(definition);
+                dataSources.put(definition.getName(), dataSource);
+
+                if (definition.getSetupScript() != null || definition.getVersionedScriptsPath() != null) {
+                    SchemaBootstrapper.bootstrap(
+                            dataSource, definition.getSetupScript(), definition.getVersionedScriptsPath(), classLoader);
+                }
+
+                sessionFactories.put(definition.getName(), ClusterSqlSessionFactoryProvider.create(definition, dataSource));
             }
-
-            sessionFactories.put(definition.getName(), ClusterSqlSessionFactoryProvider.create(definition, dataSource));
+        } catch (RuntimeException e) {
+            close();
+            throw e;
+        } finally {
+            if (classLoader != null) {
+                thread.setContextClassLoader(previous);
+            }
         }
     }
 
@@ -72,6 +104,19 @@ public class DatabaseCluster implements AutoCloseable {
         for (HikariDataSource dataSource : dataSources.values()) {
             dataSource.close();
         }
+    }
+
+    private static Map<String, DatabaseDefinition> indexByName(Collection<DatabaseDefinition> definitions) {
+        Map<String, DatabaseDefinition> indexed = new LinkedHashMap<>();
+        for (DatabaseDefinition definition : definitions) {
+            if (definition.getName() == null) {
+                throw new ClusterConfigurationException("Every database definition needs a name");
+            }
+            if (indexed.put(definition.getName(), definition) != null) {
+                throw new ClusterConfigurationException("Duplicate database name '" + definition.getName() + "'");
+            }
+        }
+        return indexed;
     }
 
     private static <T> T requireEntry(Map<String, T> map, String name) {

@@ -78,6 +78,7 @@ public final class ClusterLoader {
                 .connectionTimeoutMs(pool.getLong("connection-timeout-ms", defaults.getConnectionTimeoutMs()))
                 .idleTimeoutMs(pool.getLong("idle-timeout-ms", defaults.getIdleTimeoutMs()))
                 .maxLifetimeMs(pool.getLong("max-lifetime-ms", defaults.getMaxLifetimeMs()))
+                .keepaliveTimeMs(pool.getLong("keepalive-time-ms", defaults.getKeepaliveTimeMs()))
                 .build();
     }
 

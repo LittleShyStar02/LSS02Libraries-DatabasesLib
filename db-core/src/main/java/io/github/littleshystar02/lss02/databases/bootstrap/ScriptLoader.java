@@ -15,10 +15,14 @@ public final class ScriptLoader {
     }
 
     public static String load(String location) {
+        return load(location, null);
+    }
+
+    public static String load(String location, ClassLoader classLoader) {
         try {
             if (location.startsWith(CLASSPATH_PREFIX)) {
                 String resourcePath = location.substring(CLASSPATH_PREFIX.length());
-                try (InputStream stream = Thread.currentThread().getContextClassLoader().getResourceAsStream(resourcePath)) {
+                try (InputStream stream = resolve(classLoader).getResourceAsStream(resourcePath)) {
                     if (stream == null) {
                         throw new SchemaMigrationException("Script '" + resourcePath + "' was not found on the classpath");
                     }
@@ -29,5 +33,13 @@ public final class ScriptLoader {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    static ClassLoader resolve(ClassLoader classLoader) {
+        if (classLoader != null) {
+            return classLoader;
+        }
+        ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+        return contextClassLoader != null ? contextClassLoader : ScriptLoader.class.getClassLoader();
     }
 }

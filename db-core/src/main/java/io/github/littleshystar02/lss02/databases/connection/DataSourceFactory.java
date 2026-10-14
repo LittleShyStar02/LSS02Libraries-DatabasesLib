@@ -40,6 +40,7 @@ public final class DataSourceFactory {
         config.setConnectionTimeout(pool.getConnectionTimeoutMs());
         config.setIdleTimeout(pool.getIdleTimeoutMs());
         config.setMaxLifetime(pool.getMaxLifetimeMs());
+        config.setKeepaliveTime(pool.getKeepaliveTimeMs());
 
         return new HikariDataSource(config);
     }

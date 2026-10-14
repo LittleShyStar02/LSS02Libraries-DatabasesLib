@@ -28,6 +28,7 @@ class ClusterLoaderTest {
                 pool:
                   maximum-pool-size: 10
                   minimum-idle: 2
+                  keepalive-time-ms: 45000
                 migrations:
                   setup-script: classpath:db/mysql/setup.sql
                   versioned-scripts-path: classpath:db/mysql/migrations
@@ -60,6 +61,7 @@ class ClusterLoaderTest {
         assertEquals("shop_password", mysql.getPassword());
         assertEquals("false", mysql.getOptions().get("useSSL"));
         assertEquals(10, mysql.getPool().getMaximumPoolSize());
+        assertEquals(45000, mysql.getPool().getKeepaliveTimeMs());
         assertEquals("classpath:db/mysql/setup.sql", mysql.getSetupScript());
         assertEquals("com.example.mysql.mappers", mysql.getMapperBasePackage());
 

@@ -15,6 +15,11 @@ public final class SchemaBootstrapper {
     }
 
     public static void bootstrap(DataSource dataSource, String setupScriptLocation, String versionedScriptsLocation) {
+        bootstrap(dataSource, setupScriptLocation, versionedScriptsLocation, null);
+    }
+
+    public static void bootstrap(DataSource dataSource, String setupScriptLocation, String versionedScriptsLocation,
+                                 ClassLoader classLoader) {
         try (Connection connection = dataSource.getConnection()) {
             SchemaHistoryRepository history = new SchemaHistoryRepository(connection);
             history.ensureTableExists();
@@ -22,7 +27,7 @@ public final class SchemaBootstrapper {
             Map<Integer, String> applied = history.findAppliedChecksums();
 
             if (!applied.containsKey(BASELINE_VERSION) && setupScriptLocation != null) {
-                String content = ScriptLoader.load(setupScriptLocation);
+                String content = ScriptLoader.load(setupScriptLocation, classLoader);
                 runScript(connection, content);
                 MigrationScript baseline = new MigrationScript(
                         BASELINE_VERSION, "baseline", "setup.sql", content, ChecksumUtil.sha256(content));
@@ -30,7 +35,7 @@ public final class SchemaBootstrapper {
                 applied.put(BASELINE_VERSION, baseline.getChecksum());
             }
 
-            for (MigrationScript script : MigrationScanner.scan(versionedScriptsLocation)) {
+            for (MigrationScript script : MigrationScanner.scan(versionedScriptsLocation, classLoader)) {
                 String existingChecksum = applied.get(script.getVersion());
                 if (existingChecksum != null) {
                     if (!existingChecksum.equals(script.getChecksum())) {

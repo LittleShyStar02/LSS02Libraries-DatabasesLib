@@ -25,6 +25,7 @@ database-cluster:
     pool:
       maximum-pool-size: 10
       minimum-idle: 2
+      keepalive-time-ms: 120000
     migrations:
       setup-script: classpath:db/mysql/setup.sql
       versioned-scripts-path: classpath:db/mysql/migrations
@@ -51,7 +52,17 @@ configuration.load();
 DatabaseCluster cluster = new DatabaseCluster(configuration);
 ```
 
-Construction is eager: every database entry gets its pool built and its schema bootstrapped immediately, so a misconfigured entry fails at startup instead of on the first request that happens to touch it.
+Construction is eager: every database entry gets its pool built and its schema bootstrapped immediately, so a misconfigured entry fails at startup instead of on the first request that happens to touch it. If one entry fails, the pools already opened for the earlier entries are closed before the exception reaches you.
+
+Two more constructors cover the cases where the YAML file is not the right entry point:
+
+```java
+DatabaseCluster cluster = new DatabaseCluster(configuration, plugin.getClass().getClassLoader());
+
+DatabaseCluster cluster = new DatabaseCluster(List.of(definition));
+```
+
+The `ClassLoader` argument is the one used to resolve `classpath:` scripts and mapper packages while the cluster is built, which is what you want inside a Bukkit/Paper plugin or any other isolated class loader. Without it the thread's context class loader is used, as before. `classpath:` migration folders also work when they live inside a jar. A `DatabaseDefinition` can be built in code with its builder, so a cluster does not need a YAML file at all; database names must be unique.
 
 ## Running a mapper
 

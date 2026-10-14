@@ -12,6 +12,7 @@ public class PoolSettings {
     long connectionTimeoutMs;
     long idleTimeoutMs;
     long maxLifetimeMs;
+    long keepaliveTimeMs;
 
     public static PoolSettings defaults() {
         return PoolSettings.builder()
@@ -20,6 +21,7 @@ public class PoolSettings {
                 .connectionTimeoutMs(30000)
                 .idleTimeoutMs(600000)
                 .maxLifetimeMs(1800000)
+                .keepaliveTimeMs(0)
                 .build();
     }
 }
