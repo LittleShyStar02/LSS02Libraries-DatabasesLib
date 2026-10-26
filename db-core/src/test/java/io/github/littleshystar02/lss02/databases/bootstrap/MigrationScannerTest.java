@@ -15,13 +15,16 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/** Tests for {@link MigrationScanner}: directory scanning, ordering and jar-packed migrations. */
 class MigrationScannerTest {
 
+    /** A {@code null} location means no scripts. */
     @Test
     void returnsAnEmptyListWhenNoLocationIsConfigured() {
         assertTrue(MigrationScanner.scan(null).isEmpty());
     }
 
+    /** Scripts inside a jar are found, and scanning the same jar twice works. */
     @Test
     void scansMigrationsPackedInsideAJarAndCanDoSoRepeatedly(@TempDir Path directory) throws IOException {
         Map<String, String> entries = new LinkedHashMap<>();
@@ -42,6 +45,7 @@ class MigrationScannerTest {
         }
     }
 
+    /** Scripts are sorted by numeric version and files not matching the naming pattern are skipped. */
     @Test
     void ordersScriptsByVersionAndIgnoresUnrelatedFiles(@TempDir Path directory) throws IOException {
         Files.writeString(directory.resolve("V2__add_index.sql"), "create index idx on t (id);");

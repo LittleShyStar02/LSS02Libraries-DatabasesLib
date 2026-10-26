@@ -4,11 +4,23 @@ import io.github.littleshystar02.lss02.databases.migration.UnsupportedTypeMappin
 
 import java.sql.Types;
 
+/** Translates JDBC column types into engine-neutral {@link LogicalType} values. */
 public final class TypeMapping {
 
+    /** Not instantiable: this class only holds static helpers. */
     private TypeMapping() {
     }
 
+    /**
+     * Maps the JDBC type code of a column to a logical type: small and regular integers to
+     * {@code INTEGER}, character types to {@code VARCHAR}, long text and CLOB to {@code TEXT}, boolean
+     * and bit to {@code BOOLEAN}, and decimal and numeric to {@code DECIMAL}.
+     *
+     * @param tableName the table that contains the column, used in the error report
+     * @param column the column to classify
+     * @return the logical type
+     * @throws UnsupportedTypeMappingException if the JDBC type is not supported, for example binary data
+     */
     public static LogicalType toLogicalType(String tableName, ColumnSchema column) {
         switch (column.getJdbcType()) {
             case Types.TINYINT:

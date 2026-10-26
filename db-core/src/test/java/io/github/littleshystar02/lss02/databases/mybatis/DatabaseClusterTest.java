@@ -25,8 +25,16 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+/** End-to-end tests for {@link DatabaseCluster} against temporary SQLite databases. */
 class DatabaseClusterTest {
 
+    /**
+     * Writes a one-database cluster configuration (SQLite file, setup script, mapper package) and loads it.
+     *
+     * @param tempDir the directory for the database and the configuration file
+     * @return the loaded configuration
+     * @throws IOException if the file cannot be written or read
+     */
     private DatabaseClusterConfiguration configure(Path tempDir) throws IOException {
         Path dbFile = tempDir.resolve("archive.db");
         String yaml = """
@@ -47,6 +55,7 @@ class DatabaseClusterTest {
         return configuration;
     }
 
+    /** The schema is created from the scripts and a mapper can insert and read rows. */
     @Test
     void bootstrapsSchemaAndExecutesAMapperEndToEnd(@TempDir Path tempDir) throws IOException {
         try (DatabaseCluster cluster = new DatabaseCluster(configure(tempDir))) {
@@ -64,6 +73,7 @@ class DatabaseClusterTest {
         }
     }
 
+    /** Starting a second cluster on the same database does not reapply scripts. */
     @Test
     void bootstrapIsIdempotentAcrossRestarts(@TempDir Path tempDir) throws IOException {
         DatabaseClusterConfiguration configuration = configure(tempDir);
@@ -83,6 +93,7 @@ class DatabaseClusterTest {
         }
     }
 
+    /** A cluster built from definitions loads its scripts through the supplied class loader. */
     @Test
     void buildsFromDefinitionsAndReadsScriptsFromTheGivenClassLoader(@TempDir Path tempDir) throws Exception {
         Map<String, String> entries = new LinkedHashMap<>();
@@ -107,6 +118,7 @@ class DatabaseClusterTest {
         }
     }
 
+    /** Two definitions with the same name are rejected. */
     @Test
     void rejectsDuplicateDefinitionNames(@TempDir Path tempDir) {
         DatabaseDefinition first = DatabaseDefinition.builder()
@@ -117,6 +129,14 @@ class DatabaseClusterTest {
         assertThrows(ClusterConfigurationException.class, () -> new DatabaseCluster(List.of(first, second)));
     }
 
+    /**
+     * Counts the tables with a given name in the {@code main} database.
+     *
+     * @param cluster the cluster to query
+     * @param table the table name
+     * @return 1 if the table exists, 0 otherwise
+     * @throws SQLException if the query fails
+     */
     private static int countTables(DatabaseCluster cluster, String table) throws SQLException {
         try (Connection connection = cluster.getDataSource("main").getConnection();
              Statement statement = connection.createStatement();
@@ -127,6 +147,7 @@ class DatabaseClusterTest {
         }
     }
 
+    /** Looking up a name that is not configured fails with a clear error. */
     @Test
     void throwsForAnUnknownDatabaseName(@TempDir Path tempDir) throws IOException {
         try (DatabaseCluster cluster = new DatabaseCluster(configure(tempDir))) {

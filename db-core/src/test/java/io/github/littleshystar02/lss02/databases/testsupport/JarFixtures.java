@@ -13,11 +13,22 @@ import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
+/** Helpers that build small jar files and isolated class loaders for classpath-related tests. */
 public final class JarFixtures {
 
+    /** Not instantiable: this class only holds static helpers. */
     private JarFixtures() {
     }
 
+    /**
+     * Writes a jar file whose entries contain the given text, adding the directory entries that lead to
+     * them.
+     *
+     * @param jarFile the jar file to create
+     * @param entries entry path inside the jar mapped to its UTF-8 text content
+     * @return {@code jarFile}, for chaining
+     * @throws IOException if the jar cannot be written
+     */
     public static Path createJar(Path jarFile, Map<String, String> entries) throws IOException {
         try (OutputStream out = Files.newOutputStream(jarFile); JarOutputStream jar = new JarOutputStream(out)) {
             Set<String> directories = new LinkedHashSet<>();
@@ -41,6 +52,14 @@ public final class JarFixtures {
         return jarFile;
     }
 
+    /**
+     * Creates a class loader that sees only the given jar, with no parent, so tests can prove that
+     * resources are not leaking from the application class path.
+     *
+     * @param jarFile the jar to expose
+     * @return the class loader, which the caller should close
+     * @throws IOException if the jar path cannot be converted to a URL
+     */
     public static URLClassLoader isolatedLoader(Path jarFile) throws IOException {
         return new URLClassLoader(new URL[]{jarFile.toUri().toURL()}, null);
     }

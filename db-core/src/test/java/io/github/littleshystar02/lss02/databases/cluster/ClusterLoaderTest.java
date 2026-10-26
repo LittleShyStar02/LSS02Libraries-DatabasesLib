@@ -12,8 +12,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+/** Tests for {@link ClusterLoader}: parsing of the {@code database-cluster} section. */
 class ClusterLoaderTest {
 
+    /** Sample cluster configuration with a MySQL and a SQLite entry, used by the parsing tests. */
     private static final String YAML = """
             database-cluster:
               primary-mysql:
@@ -40,6 +42,14 @@ class ClusterLoaderTest {
                 file-path: ./data/archive.db
             """;
 
+    /**
+     * Writes YAML to a temporary file and loads it as a cluster configuration.
+     *
+     * @param tempDir the directory for the temporary file
+     * @param yaml the file content
+     * @return the loaded configuration
+     * @throws IOException if the file cannot be written or read
+     */
     private DatabaseClusterConfiguration load(Path tempDir, String yaml) throws IOException {
         Path file = tempDir.resolve("cluster.yml");
         Files.writeString(file, yaml);
@@ -48,6 +58,7 @@ class ClusterLoaderTest {
         return configuration;
     }
 
+    /** Every entry becomes a definition with its connection, option, pool, migration and mapper settings. */
     @Test
     void parsesEachEntryIntoADatabaseDefinition(@TempDir Path tempDir) throws IOException {
         Map<String, DatabaseDefinition> definitions = ClusterLoader.load(load(tempDir, YAML));
@@ -71,6 +82,7 @@ class ClusterLoaderTest {
         assertNull(sqlite.getHost());
     }
 
+    /** A missing {@code pool} section falls back to {@link PoolSettings#defaults()}. */
     @Test
     void appliesPoolDefaultsWhenNoPoolSectionIsPresent(@TempDir Path tempDir) throws IOException {
         Map<String, DatabaseDefinition> definitions = ClusterLoader.load(load(tempDir, YAML));
@@ -78,6 +90,7 @@ class ClusterLoaderTest {
         assertEquals(PoolSettings.defaults(), definitions.get("archive-sqlite").getPool());
     }
 
+    /** A placeholder for an unset environment variable fails the load. */
     @Test
     void failsFastWhenAnEnvVariableIsMissing(@TempDir Path tempDir) throws IOException {
         String yamlWithEnvVar = YAML.replace("password: shop_password", "password: ${LSS02_DEFINITELY_UNSET_VARIABLE}");
@@ -86,6 +99,7 @@ class ClusterLoaderTest {
         assertThrows(ClusterConfigurationException.class, () -> ClusterLoader.load(configuration));
     }
 
+    /** A file without the {@code database-cluster} section is rejected. */
     @Test
     void failsFastWhenTheRootSectionIsMissing(@TempDir Path tempDir) throws IOException {
         DatabaseClusterConfiguration configuration = load(tempDir, "not-the-right-key: {}");

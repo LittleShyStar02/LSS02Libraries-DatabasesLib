@@ -10,11 +10,35 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.stream.Collectors;
 
+/**
+ * Copies all rows of one table from a source connection to a target connection.
+ *
+ * <p>Rows are read with a single {@code SELECT}, inserted with a prepared statement in batches, and
+ * each batch is committed on its own, so memory use is bounded by the batch size on the target side.
+ * Columns are matched by position and values are passed through {@code getObject}/{@code setObject}
+ * without conversion.
+ */
 public final class DataCopier {
 
+    /** Not instantiable: this class only holds static helpers. */
     private DataCopier() {
     }
 
+    /**
+     * Copies one table and reports progress.
+     *
+     * <p>The target connection is switched to manual commit for the duration of the copy and its original
+     * auto-commit mode is restored afterwards, even on failure. The listener is notified when the table
+     * starts, after every committed batch, when the table completes, or when an error occurs.
+     *
+     * @param source the connection to read from
+     * @param target the connection to write to; the table must already exist there
+     * @param table the structure of the table, which defines the columns and their order
+     * @param batchSize the number of rows per insert batch and commit
+     * @param listener receives the progress events
+     * @return the number of rows copied
+     * @throws DatabaseMigrationException if the target cannot be prepared or the copy fails
+     */
     public static long copy(Connection source, Connection target, TableSchema table, int batchSize, MigrationProgressListener listener) {
         String columns = table.getColumns().stream().map(c -> c.getName()).collect(Collectors.joining(", "));
         String selectSql = "SELECT " + columns + " FROM " + table.getName();

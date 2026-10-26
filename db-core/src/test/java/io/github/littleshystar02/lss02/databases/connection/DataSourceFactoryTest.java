@@ -11,8 +11,16 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+/** Tests for {@link DataSourceFactory} pool configuration, run against a temporary SQLite file. */
 class DataSourceFactoryTest {
 
+    /**
+     * Creates a pool for a temporary SQLite database with the given pool settings.
+     *
+     * @param tempDir the directory that holds the database file
+     * @param pool the pool settings to apply
+     * @return the open pool, which the test must close
+     */
     private HikariDataSource create(Path tempDir, PoolSettings pool) {
         DatabaseDefinition definition = DatabaseDefinition.builder()
                 .name("pool-test")
@@ -23,6 +31,7 @@ class DataSourceFactoryTest {
         return DataSourceFactory.create(definition);
     }
 
+    /** The configured keep-alive time reaches the Hikari configuration. */
     @Test
     void appliesTheConfiguredKeepaliveTime(@TempDir Path tempDir) {
         PoolSettings pool = PoolSettings.builder()
@@ -39,6 +48,7 @@ class DataSourceFactoryTest {
         }
     }
 
+    /** Keep-alive stays disabled when the settings are the defaults. */
     @Test
     void leavesKeepaliveDisabledByDefault(@TempDir Path tempDir) {
         try (HikariDataSource dataSource = create(tempDir, PoolSettings.defaults())) {

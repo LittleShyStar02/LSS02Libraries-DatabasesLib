@@ -14,14 +14,22 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+/** Tests for {@link DatabaseMigrator} using two temporary SQLite databases. */
 class DatabaseMigratorTest {
 
+    /**
+     * Creates a data source for a SQLite file.
+     *
+     * @param dbFile the database file
+     * @return the data source
+     */
     private SQLiteDataSource dataSourceFor(Path dbFile) {
         SQLiteDataSource dataSource = new SQLiteDataSource();
         dataSource.setUrl("jdbc:sqlite:" + dbFile);
         return dataSource;
     }
 
+    /** Table structure and rows are copied from one database to the other. */
     @Test
     void migratesSchemaAndDataBetweenTwoSqliteDatabases(@TempDir Path tempDir) throws SQLException {
         SQLiteDataSource source = dataSourceFor(tempDir.resolve("source.db"));
@@ -48,6 +56,7 @@ class DatabaseMigratorTest {
         }
     }
 
+    /** A batch size below the row count still copies every row. */
     @Test
     void batchesSmallerThanTheTotalRowCountStillCopyEverything(@TempDir Path tempDir) throws SQLException {
         SQLiteDataSource source = dataSourceFor(tempDir.resolve("source.db"));

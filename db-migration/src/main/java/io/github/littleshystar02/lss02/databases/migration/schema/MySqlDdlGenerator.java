@@ -2,8 +2,19 @@ package io.github.littleshystar02.lss02.databases.migration.schema;
 
 import io.github.littleshystar02.lss02.databases.migration.UnsupportedTypeMappingException;
 
+/** DDL generator for MySQL, with identifiers quoted in backticks. Also used by MariaDB. */
 public class MySqlDdlGenerator extends AbstractDdlGenerator {
 
+    /**
+     * Maps a logical type to MySQL: {@code INT}, {@code BIGINT}, {@code VARCHAR(n)} (default 255),
+     * {@code TEXT}, {@code BOOLEAN}, {@code DATE}, {@code TIMESTAMP} and {@code DECIMAL(p,s)} (default
+     * 18,2).
+     *
+     * @param tableName the table that contains the column
+     * @param column the column to translate
+     * @return the MySQL type declaration
+     * @throws UnsupportedTypeMappingException if the JDBC type has no logical type
+     */
     @Override
     protected String mapType(String tableName, ColumnSchema column) {
         switch (TypeMapping.toLogicalType(tableName, column)) {
@@ -28,6 +39,12 @@ public class MySqlDdlGenerator extends AbstractDdlGenerator {
         }
     }
 
+    /**
+     * Quotes an identifier with backticks.
+     *
+     * @param identifier the raw name
+     * @return the quoted name
+     */
     @Override
     protected String quoteIdentifier(String identifier) {
         return "`" + identifier + "`";
