@@ -121,8 +121,8 @@ This is deliberately scoped down for v0.1.0. It copies column structure and row 
 
 ```kotlin
 dependencies {
-    implementation("io.github.littleshystar02:db-core:0.1.3")
-    implementation("io.github.littleshystar02:db-migration:0.1.3") // only if you need cross-database migration
+    implementation("io.github.littleshystar02:db-core:0.1.4")
+    implementation("io.github.littleshystar02:db-migration:0.1.4") // only if you need cross-database migration
 }
 ```
 
@@ -131,7 +131,7 @@ Both modules are on Maven Central (`mavenCentral()`). `db-core` depends on `conf
 ## Building, testing and releasing
 
 - Build and test: `./gradlew build` (Gradle wrapper 9.7.1, Java 17 toolchain downloaded by the foojay resolver if missing). The GitHub Action `.github/workflows/build.yml` runs it on every push and pull request to `main`.
-- Versions: the library version is the `version` in `gradle.properties` (semantic versioning, currently `0.1.3`); each release is a git tag `v<version>` (`v0.1.1` to `v0.1.3`). Publishing to Maven Central uses the `com.vanniktech.maven.publish` plugin and needs the owner's signing key and Central Portal credentials, which are never stored in the repository. Commits, pushes and tags are done by the owner.
+- Versions: the library version is the `version` in `gradle.properties` (semantic versioning, currently `0.1.4`); each release is a git tag `v<version>` (`v0.1.1` to `v0.1.4`). Publishing to Maven Central uses the `com.vanniktech.maven.publish` plugin and needs the owner's signing key and Central Portal credentials, which are never stored in the repository. Commits, pushes and tags are done by the owner.
 - Related repositories: [LSS02Libraries-ConfigurationLib](https://github.com/LittleShyStar02/LSS02Libraries-ConfigurationLib) (configuration layer used by `db-core`), `LSS02PluginLib-MultiLanguageSystem` (plugin that stores player languages through `db-core`) and `AetheriaMC-WebIntegration` (shared database of the NGC website).
 
 ## License
