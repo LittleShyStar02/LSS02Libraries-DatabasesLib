@@ -16,7 +16,5 @@ dependencies {
     "integrationTestImplementation"("org.testcontainers:junit-jupiter")
     "integrationTestImplementation"("org.testcontainers:mysql")
     "integrationTestImplementation"("org.testcontainers:postgresql")
-    "integrationTestImplementation"("com.mysql:mysql-connector-j:9.3.0")
-    "integrationTestImplementation"("org.postgresql:postgresql:42.7.7")
     "integrationTestImplementation"("org.xerial:sqlite-jdbc:3.49.1.0")
 }

@@ -7,6 +7,12 @@ dependencies {
     api("org.mybatis:mybatis:3.5.19")
     implementation("com.zaxxer:HikariCP:6.3.0")
 
+    // JDBC drivers shipped with the library: consumers get them transitively (api scope).
+    api("com.h2database:h2:2.5.252")
+    api("org.postgresql:postgresql:42.7.14")
+    api("org.mariadb.jdbc:mariadb-java-client:4.0.0")
+    api("com.mysql:mysql-connector-j:26.10.0")
+
     compileOnly("org.projectlombok:lombok:1.18.38")
     annotationProcessor("org.projectlombok:lombok:1.18.38")
     testCompileOnly("org.projectlombok:lombok:1.18.38")
@@ -19,6 +25,4 @@ dependencies {
     "integrationTestImplementation"("org.testcontainers:junit-jupiter")
     "integrationTestImplementation"("org.testcontainers:mysql")
     "integrationTestImplementation"("org.testcontainers:postgresql")
-    "integrationTestImplementation"("com.mysql:mysql-connector-j:9.3.0")
-    "integrationTestImplementation"("org.postgresql:postgresql:42.7.7")
 }

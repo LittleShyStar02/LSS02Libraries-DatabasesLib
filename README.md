@@ -112,10 +112,10 @@ This is deliberately scoped down for v0.1.0. It copies column structure and row 
 
 | Module | Requires | Depends on |
 |---|---|---|
-| `db-core` | Java 17 | LSS02ConfigurationLib, MyBatis, HikariCP |
+| `db-core` | Java 17 | LSS02ConfigurationLib, MyBatis, HikariCP, JDBC drivers (H2, PostgreSQL, MariaDB, MySQL) |
 | `db-migration` | Java 17 | `db-core` |
 
-Neither module bundles a JDBC driver. Add the one you need (`mysql-connector-j`, `org.postgresql:postgresql`, `org.xerial:sqlite-jdbc`, `org.mariadb.jdbc:mariadb-java-client`) as a `runtimeOnly` dependency in your own build.
+`db-core` ships the JDBC drivers for H2 (`com.h2database:h2`), PostgreSQL (`org.postgresql:postgresql`), MariaDB (`org.mariadb.jdbc:mariadb-java-client`) and MySQL (`com.mysql:mysql-connector-j`) as `api` dependencies at fixed, up-to-date versions, so any project depending on `db-core` or `db-migration` gets them transitively. SQLite is not bundled: add `org.xerial:sqlite-jdbc` as a `runtimeOnly` dependency if you use it. To use a different driver version, declare it in your own build and Gradle's conflict resolution picks the higher one (or force it with a `constraints` block).
 
 ## Adding it to your build
 
@@ -123,7 +123,6 @@ Neither module bundles a JDBC driver. Add the one you need (`mysql-connector-j`,
 dependencies {
     implementation("io.github.littleshystar02:db-core:0.1.3")
     implementation("io.github.littleshystar02:db-migration:0.1.3") // only if you need cross-database migration
-    runtimeOnly("com.mysql:mysql-connector-j:9.3.0") // whichever drivers your cluster actually uses
 }
 ```
 
