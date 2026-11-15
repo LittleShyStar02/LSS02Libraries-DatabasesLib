@@ -99,6 +99,7 @@ public class DatabaseCluster implements AutoCloseable {
         if (classLoader != null) {
             thread.setContextClassLoader(classLoader);
         }
+        boolean initialized = false;
         try {
             for (DatabaseDefinition definition : definitions.values()) {
                 HikariDataSource dataSource = DataSourceFactory.create(definition);
@@ -111,10 +112,11 @@ public class DatabaseCluster implements AutoCloseable {
 
                 sessionFactories.put(definition.getName(), ClusterSqlSessionFactoryProvider.create(definition, dataSource));
             }
-        } catch (RuntimeException e) {
-            close();
-            throw e;
+            initialized = true;
         } finally {
+            if (!initialized) {
+                close();
+            }
             if (classLoader != null) {
                 thread.setContextClassLoader(previous);
             }
@@ -244,7 +246,7 @@ public class DatabaseCluster implements AutoCloseable {
     private static <T> T requireEntry(Map<String, T> map, String name) {
         T value = map.get(name);
         if (value == null) {
-            throw new ClusterConfigurationException("Unknown database '" + name + "' — not present in the cluster configuration");
+            throw new ClusterConfigurationException("Unknown database '" + name + "': not present in the cluster configuration");
         }
         return value;
     }
