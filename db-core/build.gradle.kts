@@ -3,26 +3,39 @@ apply(plugin = "com.vanniktech.maven.publish")
 description = "Cluster-based MyBatis configuration, HikariCP-backed connection pooling, and idempotent schema bootstrap per named database, on top of LSS02ConfigurationLib."
 
 dependencies {
-    api("io.github.littleshystar02:config-core:0.1.3-beta.3")
-    api("org.mybatis:mybatis:3.5.19")
-    implementation("com.zaxxer:HikariCP:6.3.0")
+    api(libs.config.core)
+    api(libs.mybatis)
+    // Public API exposes HikariCP types (MetricsTrackerFactory), so it is an api dependency.
+    api(libs.hikaricp)
+    // Logging facade only: the consumer picks the implementation (Paper, Velocity and Bukkit already provide one).
+    api(libs.slf4j.api)
 
-    // JDBC drivers shipped with the library: consumers get them transitively (api scope).
-    api("com.h2database:h2:2.5.252")
-    api("org.postgresql:postgresql:42.7.14")
-    api("org.mariadb.jdbc:mariadb-java-client:4.0.0")
-    api("com.mysql:mysql-connector-j:26.10.0")
+    // Schema migrations: flyway-core already ships the H2 and SQLite support, the modules add MySQL/MariaDB and PostgreSQL.
+    api(libs.flyway.core)
+    runtimeOnly(libs.flyway.mysql)
+    runtimeOnly(libs.flyway.postgresql)
 
-    compileOnly("org.projectlombok:lombok:1.18.38")
-    annotationProcessor("org.projectlombok:lombok:1.18.38")
-    testCompileOnly("org.projectlombok:lombok:1.18.38")
-    testAnnotationProcessor("org.projectlombok:lombok:1.18.38")
+    // JDBC drivers are NOT shipped: the library never references a driver class at compile time, so each
+    // consumer declares (runtimeOnly) the driver of the engines it actually uses. See the README.
 
-    testImplementation("org.mockito:mockito-core:5.22.0")
-    testImplementation("org.xerial:sqlite-jdbc:3.49.1.0")
+    compileOnly(libs.lombok)
+    annotationProcessor(libs.lombok)
+    testCompileOnly(libs.lombok)
+    testAnnotationProcessor(libs.lombok)
 
-    "integrationTestImplementation"(platform("org.testcontainers:testcontainers-bom:1.21.3"))
+    testImplementation(libs.mockito.core)
+    testRuntimeOnly(libs.h2)
+    testRuntimeOnly(libs.sqlite.jdbc)
+    testRuntimeOnly(libs.mysql.connector)
+    testRuntimeOnly(libs.postgresql)
+    testRuntimeOnly(libs.mariadb.client)
+
+    "integrationTestImplementation"(platform(libs.testcontainers.bom))
     "integrationTestImplementation"("org.testcontainers:junit-jupiter")
     "integrationTestImplementation"("org.testcontainers:mysql")
     "integrationTestImplementation"("org.testcontainers:postgresql")
+    "integrationTestImplementation"("org.testcontainers:mariadb")
+    "integrationTestRuntimeOnly"(libs.mysql.connector)
+    "integrationTestRuntimeOnly"(libs.postgresql)
+    "integrationTestRuntimeOnly"(libs.mariadb.client)
 }

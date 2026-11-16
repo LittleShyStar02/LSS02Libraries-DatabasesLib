@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 package io.github.littleshystar02.lss02.databases.migration.schema;
 
 import io.github.littleshystar02.lss02.databases.migration.UnsupportedTypeMappingException;
@@ -25,6 +26,7 @@ public final class TypeMapping {
         switch (column.getJdbcType()) {
             case Types.TINYINT:
             case Types.SMALLINT:
+                return LogicalType.SMALLINT;
             case Types.INTEGER:
                 return LogicalType.INTEGER;
             case Types.BIGINT:
@@ -38,6 +40,18 @@ public final class TypeMapping {
             case Types.LONGNVARCHAR:
             case Types.CLOB:
                 return LogicalType.TEXT;
+            case Types.REAL:
+                return LogicalType.REAL;
+            case Types.FLOAT:
+            case Types.DOUBLE:
+                return LogicalType.DOUBLE;
+            case Types.BINARY:
+            case Types.VARBINARY:
+            case Types.LONGVARBINARY:
+            case Types.BLOB:
+                return LogicalType.BLOB;
+            case Types.TIME:
+                return LogicalType.TIME;
             case Types.BOOLEAN:
             case Types.BIT:
                 return LogicalType.BOOLEAN;

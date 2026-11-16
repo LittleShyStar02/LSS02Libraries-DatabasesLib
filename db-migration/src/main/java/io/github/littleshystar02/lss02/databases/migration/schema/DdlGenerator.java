@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 package io.github.littleshystar02.lss02.databases.migration.schema;
 
 /**
@@ -16,4 +17,13 @@ public interface DdlGenerator {
      *         column type cannot be represented in the dialect
      */
     String generateCreateTable(TableSchema table);
+
+    /**
+     * Generates a statement that drops a table if it exists, used to undo a partially applied schema
+     * migration.
+     *
+     * @param table the structure of the table to drop
+     * @return the DDL statement in the dialect of this generator
+     */
+    String generateDropTable(TableSchema table);
 }

@@ -1,8 +1,11 @@
+// SPDX-License-Identifier: GPL-3.0-only
 package io.github.littleshystar02.lss02.databases.cluster;
 
 import org.simpleyaml.configuration.ConfigurationSection;
 
+import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -29,8 +32,7 @@ public final class ClusterLoader {
      * @return the definitions keyed by database name, in the order they appear in the file
      * @throws ClusterConfigurationException if the {@code database-cluster} section is missing, an entry
      *         is not a section, or a referenced environment variable is not set
-     * @throws IllegalArgumentException if an entry has a {@code type} that is not a known
-     *         {@link DatabaseType}
+     *         or an entry has a {@code type} that is not a known {@link DatabaseType}
      */
     public static Map<String, DatabaseDefinition> load(DatabaseClusterConfiguration configuration) {
         ConfigurationSection root = configuration.getConfigurationSection(ROOT_SECTION);
@@ -59,7 +61,7 @@ public final class ClusterLoader {
      */
     private static DatabaseDefinition parseDefinition(String name, ConfigurationSection entry) {
         String typeValue = interpolate(entry.getString("type"));
-        DatabaseType type = typeValue == null ? null : DatabaseType.valueOf(typeValue.toUpperCase());
+        DatabaseType type = parseType(name, typeValue);
 
         ConfigurationSection migrations = entry.getConfigurationSection("migrations");
         ConfigurationSection mappers = entry.getConfigurationSection("mappers");
@@ -76,12 +78,33 @@ public final class ClusterLoader {
                 .jdbcUrl(interpolate(entry.getString("jdbc-url")))
                 .driverClassName(interpolate(entry.getString("driver-class-name")))
                 .options(parseOptions(entry.getConfigurationSection("options")))
-                .pool(parsePool(entry.getConfigurationSection("pool")))
+                .pool(parsePool(entry.getConfigurationSection("pool"), type))
                 .setupScript(migrations == null ? null : interpolate(migrations.getString("setup-script")))
                 .versionedScriptsPath(migrations == null ? null : interpolate(migrations.getString("versioned-scripts-path")))
-                .mapperBasePackage(mappers == null ? null : mappers.getString("base-package"))
-                .entityBasePackage(mappers == null ? null : mappers.getString("entity-package"))
+                .mapperBasePackage(mappers == null ? null : interpolate(mappers.getString("base-package")))
+                .entityBasePackage(mappers == null ? null : interpolate(mappers.getString("entity-package")))
                 .build();
+    }
+
+    /**
+     * Resolves the {@code type} value, ignoring the default locale and case.
+     *
+     * @param name the entry name, used in the error message
+     * @param typeValue the interpolated value, may be {@code null}
+     * @return the engine, or {@code null} when no type is given
+     * @throws ClusterConfigurationException if the value is not a known engine
+     */
+    private static DatabaseType parseType(String name, String typeValue) {
+        if (typeValue == null) {
+            return null;
+        }
+        try {
+            return DatabaseType.valueOf(typeValue.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new ClusterConfigurationException("Entry '" + name + "' has unknown type '" + typeValue
+                    + "'; allowed values: "
+                    + Arrays.stream(DatabaseType.values()).map(t -> t.name().toLowerCase(Locale.ROOT)).toList());
+        }
     }
 
     /**
@@ -102,16 +125,18 @@ public final class ClusterLoader {
     }
 
     /**
-     * Reads the {@code pool} section, taking {@link PoolSettings#defaults()} for any missing value.
+     * Reads the {@code pool} section, taking {@link PoolSettings#defaultsFor(DatabaseType)} for any missing value.
      *
      * @param pool the {@code pool} section, may be {@code null}
+     * @param type the engine of the database, selects the defaults; may be {@code null}
      * @return the pool settings, the defaults when the section is absent
      */
-    private static PoolSettings parsePool(ConfigurationSection pool) {
-        PoolSettings defaults = PoolSettings.defaults();
+    private static PoolSettings parsePool(ConfigurationSection pool, DatabaseType type) {
+        PoolSettings defaults = PoolSettings.defaultsFor(type);
         if (pool == null) {
             return defaults;
         }
+        String initSql = interpolate(pool.getString("connection-init-sql"));
         return PoolSettings.builder()
                 .maximumPoolSize(pool.getInt("maximum-pool-size", defaults.getMaximumPoolSize()))
                 .minimumIdle(pool.getInt("minimum-idle", defaults.getMinimumIdle()))
@@ -119,6 +144,13 @@ public final class ClusterLoader {
                 .idleTimeoutMs(pool.getLong("idle-timeout-ms", defaults.getIdleTimeoutMs()))
                 .maxLifetimeMs(pool.getLong("max-lifetime-ms", defaults.getMaxLifetimeMs()))
                 .keepaliveTimeMs(pool.getLong("keepalive-time-ms", defaults.getKeepaliveTimeMs()))
+                .leakDetectionThresholdMs(
+                        pool.getLong("leak-detection-threshold-ms", defaults.getLeakDetectionThresholdMs()))
+                .initializationFailTimeoutMs(
+                        pool.getLong("initialization-fail-timeout-ms", defaults.getInitializationFailTimeoutMs()))
+                .validationTimeoutMs(pool.getLong("validation-timeout-ms", defaults.getValidationTimeoutMs()))
+                .connectionInitSql(initSql != null ? initSql : defaults.getConnectionInitSql())
+                .registerMbeans(pool.getBoolean("register-mbeans", defaults.isRegisterMbeans()))
                 .build();
     }
 

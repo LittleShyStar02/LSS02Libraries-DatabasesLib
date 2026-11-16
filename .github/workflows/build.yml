@@ -6,9 +6,59 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
+    name: Build and test (JDK ${{ matrix.java }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Compilation always uses the Java 17 toolchain; the matrix selects the JDK the tests run on.
+        java: [17, 21]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: |
+            17
+            ${{ matrix.java }}
+
+      # Safety net: never fail the build if gradlew lacks the executable bit in the git index.
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # Caches Gradle and validates the wrapper checksum.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build, test and verify
+        run: ./gradlew build -PtestJavaVersion=${{ matrix.java }}
+
+      - name: Check that the POMs can be generated
+        run: ./gradlew generatePomFileForMavenPublication
+
+      - name: Upload coverage reports
+        if: matrix.java == 17
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-reports
+          path: "**/build/reports/jacoco/test/html"
+          if-no-files-found: ignore
+
+  integration-test:
+    name: Integration tests (Testcontainers)
+    runs-on: ubuntu-latest
+    # Docker is preinstalled on ubuntu-latest: this job is the only place where the container based tests run.
     steps:
       - uses: actions/checkout@v4
 
@@ -21,5 +71,8 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      - name: Build and test
-        run: ./gradlew build --no-daemon
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Run integration tests
+        run: ./gradlew integrationTest

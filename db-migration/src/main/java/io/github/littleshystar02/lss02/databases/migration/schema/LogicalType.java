@@ -1,25 +1,32 @@
+// SPDX-License-Identifier: GPL-3.0-only
 package io.github.littleshystar02.lss02.databases.migration.schema;
 
-/**
- * Engine-neutral column types used as the middle step of a cross-database migration: a JDBC type is
- * first mapped to one of these (see {@link TypeMapping}) and each {@link DdlGenerator} then renders it
- * in its own dialect.
- */
+/** Dialect-neutral column types the migration can translate between engines. */
 public enum LogicalType {
-    /** Whole numbers up to 32 bits (also tiny and small integers). */
+    /** 32-bit integer. */
     INTEGER,
-    /** 64 bit whole numbers. */
+    /** 16-bit integer (also used for TINYINT). */
+    SMALLINT,
+    /** 64-bit integer. */
     BIGINT,
-    /** Variable length text with a declared maximum size. */
+    /** Single precision floating point. */
+    REAL,
+    /** Double precision floating point. */
+    DOUBLE,
+    /** Bounded text. */
     VARCHAR,
-    /** Long text without a declared size. */
+    /** Unbounded text. */
     TEXT,
-    /** True or false values. */
+    /** True/false value. */
     BOOLEAN,
-    /** Calendar date without time. */
+    /** Calendar date. */
     DATE,
+    /** Time of day. */
+    TIME,
     /** Date and time. */
     TIMESTAMP,
-    /** Exact numbers with precision and scale. */
-    DECIMAL
+    /** Exact number with precision and scale. */
+    DECIMAL,
+    /** Binary data. */
+    BLOB
 }

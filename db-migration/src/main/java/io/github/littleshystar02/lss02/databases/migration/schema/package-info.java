@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * Schema introspection and DDL generation: reads table structures through JDBC metadata, maps column
  * types to engine-neutral logical types and renders {@code CREATE TABLE} statements per database

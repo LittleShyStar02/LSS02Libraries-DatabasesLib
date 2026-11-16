@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 package io.github.littleshystar02.lss02.databases.migration;
 
 import io.github.littleshystar02.lss02.databases.cluster.DatabaseType;
@@ -13,6 +14,9 @@ import java.sql.Statement;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Tests for {@link DatabaseMigrator} using two temporary SQLite databases. */
 class DatabaseMigratorTest {
@@ -53,6 +57,30 @@ class DatabaseMigratorTest {
             resultSet.next();
             assertEquals(2, resultSet.getInt("id"));
             assertEquals("Grace", resultSet.getString("name"));
+        }
+    }
+
+    /** When a table cannot be created, the tables created before it are dropped so the call can be retried. */
+    @Test
+    void failedSchemaMigrationDropsTheTablesItCreated(@TempDir Path tempDir) throws SQLException {
+        SQLiteDataSource source = dataSourceFor(tempDir.resolve("source.db"));
+        SQLiteDataSource target = dataSourceFor(tempDir.resolve("target.db"));
+
+        try (Connection connection = source.getConnection(); Statement statement = connection.createStatement()) {
+            statement.execute("CREATE TABLE first_table (id INTEGER NOT NULL)");
+            statement.execute("CREATE TABLE second_table (id INTEGER NOT NULL)");
+        }
+        try (Connection connection = target.getConnection(); Statement statement = connection.createStatement()) {
+            statement.execute("CREATE TABLE second_table (id INTEGER NOT NULL)");
+        }
+
+        DatabaseMigrationException error = assertThrows(DatabaseMigrationException.class, () ->
+                DatabaseMigrator.migrateSchema(source, target, DatabaseType.SQLITE, List.of("first_table", "second_table")));
+        assertTrue(error.getMessage().contains("second_table"), error.getMessage());
+
+        try (Connection connection = target.getConnection();
+             ResultSet tables = connection.getMetaData().getTables(null, null, "first_table", null)) {
+            assertFalse(tables.next(), "first_table must have been dropped again");
         }
     }
 

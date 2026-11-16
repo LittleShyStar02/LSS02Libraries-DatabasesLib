@@ -5,16 +5,24 @@ description = "Cross-database schema and data migration between two named databa
 dependencies {
     api(project(":db-core"))
 
-    compileOnly("org.projectlombok:lombok:1.18.38")
-    annotationProcessor("org.projectlombok:lombok:1.18.38")
-    testCompileOnly("org.projectlombok:lombok:1.18.38")
-    testAnnotationProcessor("org.projectlombok:lombok:1.18.38")
+    compileOnly(libs.lombok)
+    annotationProcessor(libs.lombok)
+    testCompileOnly(libs.lombok)
+    testAnnotationProcessor(libs.lombok)
 
-    testImplementation("org.xerial:sqlite-jdbc:3.49.1.0")
+    testImplementation(libs.sqlite.jdbc)
+    testRuntimeOnly(libs.h2)
+    testRuntimeOnly(libs.mysql.connector)
+    testRuntimeOnly(libs.postgresql)
+    testRuntimeOnly(libs.mariadb.client)
 
-    "integrationTestImplementation"(platform("org.testcontainers:testcontainers-bom:1.21.3"))
+    "integrationTestImplementation"(platform(libs.testcontainers.bom))
     "integrationTestImplementation"("org.testcontainers:junit-jupiter")
     "integrationTestImplementation"("org.testcontainers:mysql")
     "integrationTestImplementation"("org.testcontainers:postgresql")
-    "integrationTestImplementation"("org.xerial:sqlite-jdbc:3.49.1.0")
+    "integrationTestImplementation"("org.testcontainers:mariadb")
+    "integrationTestImplementation"(libs.sqlite.jdbc)
+    "integrationTestRuntimeOnly"(libs.mysql.connector)
+    "integrationTestRuntimeOnly"(libs.postgresql)
+    "integrationTestRuntimeOnly"(libs.mariadb.client)
 }

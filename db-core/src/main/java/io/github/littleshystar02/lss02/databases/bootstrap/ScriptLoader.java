@@ -1,8 +1,8 @@
+// SPDX-License-Identifier: GPL-3.0-only
 package io.github.littleshystar02.lss02.databases.bootstrap;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -36,7 +36,7 @@ public final class ScriptLoader {
      *                    context class loader
      * @return the script text
      * @throws SchemaMigrationException if a classpath resource does not exist
-     * @throws UncheckedIOException if the file cannot be read
+     * @throws SchemaMigrationException if the file cannot be read
      */
     public static String load(String location, ClassLoader classLoader) {
         try {
@@ -51,7 +51,7 @@ public final class ScriptLoader {
             }
             return Files.readString(Paths.get(location), StandardCharsets.UTF_8);
         } catch (IOException e) {
-            throw new UncheckedIOException(e);
+            throw new SchemaMigrationException("Could not read script '" + location + "'", e);
         }
     }
 

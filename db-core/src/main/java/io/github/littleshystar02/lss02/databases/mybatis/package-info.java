@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * MyBatis integration: the {@link io.github.littleshystar02.lss02.databases.mybatis.DatabaseCluster}
  * entry point that exposes named databases, their pools and their session factories, plus the helpers

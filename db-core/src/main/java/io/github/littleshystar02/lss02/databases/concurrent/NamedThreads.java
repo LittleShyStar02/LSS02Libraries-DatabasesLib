@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 package io.github.littleshystar02.lss02.databases.concurrent;
 
 import java.util.Objects;
@@ -16,7 +17,12 @@ import java.util.logging.Logger;
  * }</pre>
  *
  * <p>Daemon threads never keep the JVM alive, which is what a game server plugin wants for background workers.
+ *
+ * @deprecated not related to database access and no longer used by this library (the cluster has its own
+ *             private thread factory). It is kept only so existing plugins keep compiling; copy it into
+ *             your own code or a shared utility library, it will be removed in a future major release.
  */
+@Deprecated(since = "2026.1", forRemoval = true)
 public final class NamedThreads {
 
     private NamedThreads() {

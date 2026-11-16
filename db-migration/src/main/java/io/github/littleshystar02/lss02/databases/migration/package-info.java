@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * Cross-database migration: copying table structures and rows from one database to another, possibly
  * of a different engine. {@link io.github.littleshystar02.lss02.databases.migration.DatabaseMigrator}

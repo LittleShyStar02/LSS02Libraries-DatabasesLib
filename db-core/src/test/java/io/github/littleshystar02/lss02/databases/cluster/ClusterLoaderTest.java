@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 package io.github.littleshystar02.lss02.databases.cluster;
 
 import org.junit.jupiter.api.Test;
@@ -82,12 +83,12 @@ class ClusterLoaderTest {
         assertNull(sqlite.getHost());
     }
 
-    /** A missing {@code pool} section falls back to {@link PoolSettings#defaults()}. */
+    /** A missing {@code pool} section falls back to the engine defaults ({@link PoolSettings#defaultsFor(DatabaseType)}). */
     @Test
     void appliesPoolDefaultsWhenNoPoolSectionIsPresent(@TempDir Path tempDir) throws IOException {
         Map<String, DatabaseDefinition> definitions = ClusterLoader.load(load(tempDir, YAML));
 
-        assertEquals(PoolSettings.defaults(), definitions.get("archive-sqlite").getPool());
+        assertEquals(PoolSettings.defaultsFor(DatabaseType.SQLITE), definitions.get("archive-sqlite").getPool());
     }
 
     /** A placeholder for an unset environment variable fails the load. */

@@ -1,8 +1,11 @@
+// SPDX-License-Identifier: GPL-3.0-only
 package io.github.littleshystar02.lss02.databases.cluster;
 
 import lombok.Builder;
 import lombok.Value;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -54,7 +57,68 @@ public class DatabaseDefinition {
     /** Java package scanned for MyBatis mapper interfaces, or {@code null} to register none. */
     String mapperBasePackage;
     /**
-     * Java package holding the entity classes of this database; informational, read from the configuration.
+     * Java package holding the entity classes of this database; its classes are registered as MyBatis
+     * type aliases (simple class name), or {@code null} to register none.
      */
     String entityBasePackage;
+
+    /**
+     * Describes the definition for logs and exception messages. The password is masked, the JDBC URL
+     * is cut before its query string (which may carry credentials) and option values are left out.
+     *
+     * @return a text that is safe to log
+     */
+    @Override
+    public String toString() {
+        return "DatabaseDefinition(name=" + name
+                + ", type=" + type
+                + ", host=" + host
+                + ", port=" + port
+                + ", database=" + database
+                + ", username=" + username
+                + ", password=" + (password == null ? "null" : "***")
+                + ", filePath=" + filePath
+                + ", jdbcUrl=" + redactUrl(jdbcUrl)
+                + ", driverClassName=" + driverClassName
+                + ", optionKeys=" + (options == null ? "null" : options.keySet())
+                + ", mapperBasePackage=" + mapperBasePackage
+                + ", entityBasePackage=" + entityBasePackage + ")";
+    }
+
+    /**
+     * Cuts a JDBC URL before its query string and any {@code ;} property list.
+     *
+     * @param url the URL, may be {@code null}
+     * @return the URL without parameters, or {@code null}
+     */
+    private static String redactUrl(String url) {
+        if (url == null) {
+            return null;
+        }
+        int cut = url.length();
+        int query = url.indexOf('?');
+        int semicolon = url.indexOf(';');
+        if (query >= 0) {
+            cut = Math.min(cut, query);
+        }
+        if (semicolon >= 0) {
+            cut = Math.min(cut, semicolon);
+        }
+        return cut == url.length() ? url : url.substring(0, cut) + "?...";
+    }
+
+    /** Builder customisation: the options map is copied so the definition stays immutable. */
+    public static class DatabaseDefinitionBuilder {
+
+        /**
+         * Sets the extra JDBC URL parameters; the map is copied into an unmodifiable one that keeps order.
+         *
+         * @param options the parameters, may be {@code null}
+         * @return this builder
+         */
+        public DatabaseDefinitionBuilder options(Map<String, String> options) {
+            this.options = options == null ? null : Collections.unmodifiableMap(new LinkedHashMap<>(options));
+            return this;
+        }
+    }
 }

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 package io.github.littleshystar02.lss02.databases.mybatis;
 
 import com.zaxxer.hikari.HikariDataSource;
@@ -29,6 +30,10 @@ public final class ClusterSqlSessionFactoryProvider {
 
         if (definition.getMapperBasePackage() != null) {
             MapperRegistrar.registerPackage(configuration, definition.getMapperBasePackage());
+        }
+
+        if (definition.getEntityBasePackage() != null) {
+            configuration.getTypeAliasRegistry().registerAliases(definition.getEntityBasePackage());
         }
 
         return new SqlSessionFactoryBuilder().build(configuration);

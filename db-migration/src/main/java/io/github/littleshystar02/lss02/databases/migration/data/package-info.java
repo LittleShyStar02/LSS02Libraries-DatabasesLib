@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * Row copying between databases, with progress reporting and a summary of the result.
  */

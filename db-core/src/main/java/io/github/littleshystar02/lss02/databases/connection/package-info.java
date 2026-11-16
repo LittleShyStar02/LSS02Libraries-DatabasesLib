@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * Creation of pooled HikariCP data sources from database definitions.
  */
