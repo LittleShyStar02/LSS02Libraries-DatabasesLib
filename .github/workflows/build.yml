@@ -23,7 +23,7 @@ jobs:
         # Compilation always uses the Java 17 toolchain; the matrix selects the JDK the tests run on.
         java: [17, 21]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -60,7 +60,7 @@ jobs:
     runs-on: ubuntu-latest
     # Docker is preinstalled on ubuntu-latest: this job is the only place where the container based tests run.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up JDK
         uses: actions/setup-java@v4
