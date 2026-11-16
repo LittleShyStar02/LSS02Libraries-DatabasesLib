@@ -39,7 +39,7 @@ jobs:
 
       # Caches Gradle and validates the wrapper checksum.
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Build, test and verify
         run: ./gradlew build -PtestJavaVersion=${{ matrix.java }}
@@ -72,7 +72,7 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Run integration tests
         run: ./gradlew integrationTest
