@@ -179,7 +179,7 @@ The library does **not** ship JDBC drivers: it never references a driver class a
 
 ```kotlin
 dependencies {
-    implementation("io.github.littleshystar02:db-core:0.1.5-beta.4")
+    implementation("io.github.littleshystar02:db-core:0.1.5-beta.5")
     runtimeOnly("org.postgresql:postgresql:42.7.14") // the engine(s) you use
 }
 ```
@@ -190,8 +190,8 @@ Flyway's MySQL/MariaDB and PostgreSQL support modules are bundled at runtime by 
 
 ```kotlin
 dependencies {
-    implementation("io.github.littleshystar02:db-core:0.1.5-beta.4")
-    implementation("io.github.littleshystar02:db-migration:0.1.5-beta.4") // only if you need cross-database migration
+    implementation("io.github.littleshystar02:db-core:0.1.5-beta.5")
+    implementation("io.github.littleshystar02:db-migration:0.1.5-beta.5") // only if you need cross-database migration
     runtimeOnly("org.postgresql:postgresql:42.7.14") // see "JDBC drivers"
 }
 ```
@@ -215,7 +215,7 @@ repositories {
 - Integration tests: `./gradlew integrationTest` runs the Testcontainers based tests against real MySQL, PostgreSQL and MariaDB servers and needs a running Docker daemon; it is not part of `build`.
 - Coverage: JaCoCo reports are written to `<module>/build/reports/jacoco/test/html`; `check` fails below 80% of lines per module. The tests that need no Docker also run H2 in MySQL and PostgreSQL mode and SQLite.
 - CI: `.github/workflows/build.yml` runs the build on JDK 17 and 21 on every push and pull request to `main`, plus the integration tests on a Docker-enabled runner. Dependabot keeps Gradle dependencies and GitHub Actions up to date.
-- Versions and releases: the library version is the `version` in `gradle.properties` (semantic versioning, currently `0.1.5-beta.4`); each release is a git tag `v<version>`. Pushing the tag runs `.github/workflows/release.yml`, which checks that the tag matches `gradle.properties`, builds, and uploads to Maven Central through the `com.vanniktech.maven.publish` plugin (the deployment is released manually from the Central Portal). The signing key and Central Portal credentials are repository secrets, never stored in the repository. Commits, pushes and tags are done by the owner.
+- Versions and releases: the library version is the `version` in `gradle.properties` (semantic versioning, currently `0.1.5-beta.5`); each release is a git tag `v<version>`. Pushing the tag runs `.github/workflows/release.yml`, which checks that the tag matches `gradle.properties`, builds, and uploads to Maven Central through the `com.vanniktech.maven.publish` plugin (the deployment is released manually from the Central Portal). The signing key and Central Portal credentials are repository secrets, never stored in the repository. Commits, pushes and tags are done by the owner.
 - Related repositories: [LSS02Libraries-ConfigurationLib](https://github.com/LittleShyStar02/LSS02Libraries-ConfigurationLib) (configuration layer used by `db-core`), `LSS02PluginLib-MultiLanguageSystem` (plugin that stores player languages through `db-core`) and `AetheriaMC-WebIntegration` (shared database of the NGC website).
 
 ## License

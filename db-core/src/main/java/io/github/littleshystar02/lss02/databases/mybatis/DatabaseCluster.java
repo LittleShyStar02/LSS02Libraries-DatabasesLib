@@ -27,6 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.Future;
@@ -39,6 +40,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Entry point of the library: a set of named databases, each with its own connection pool and MyBatis
@@ -84,6 +86,8 @@ public class DatabaseCluster implements AutoCloseable {
     private final AtomicBoolean closed = new AtomicBoolean();
     /** Dedicated executor of the {@code ...Async} methods; its threads are created on demand and expire when idle. */
     private final ThreadPoolExecutor asyncExecutor;
+    /** Queued async tasks with their public futures, so a forced close can fail the discarded ones. */
+    private final Map<Runnable, CompletableFuture<?>> queuedTasks = new ConcurrentHashMap<>();
 
     /**
      * Creates a cluster from a loaded configuration file, using the thread context class loader.
@@ -542,9 +546,57 @@ public class DatabaseCluster implements AutoCloseable {
     public <T, R> CompletableFuture<R> withMapperAsync(String name, Class<T> mapperClass, Function<T, R> action) {
         lookup(sessionFactories, name);
         try {
-            return CompletableFuture.supplyAsync(() -> withMapper(name, mapperClass, action), asyncExecutor);
+            return submitAsync(() -> withMapper(name, mapperClass, action));
         } catch (RejectedExecutionException e) {
             return CompletableFuture.failedFuture(new IllegalStateException("The database cluster is closed", e));
+        }
+    }
+
+    /**
+     * Runs a supplier on the async executor and returns the public future. The queued task is kept
+     * together with its future, so a forced close can complete exceptionally the work it discards.
+     *
+     * @param <R> the result type
+     * @param supplier the work
+     * @return the future of the result
+     * @throws RejectedExecutionException if the executor no longer accepts work
+     */
+    private <R> CompletableFuture<R> submitAsync(Supplier<R> supplier) {
+        CompletableFuture<R> future = new CompletableFuture<>();
+        Runnable[] holder = new Runnable[1];
+        Runnable task = () -> {
+            queuedTasks.remove(holder[0]);
+            if (future.isDone()) {
+                return;
+            }
+            try {
+                future.complete(supplier.get());
+            } catch (Throwable t) {
+                future.completeExceptionally(t);
+            }
+        };
+        holder[0] = task;
+        queuedTasks.put(task, future);
+        try {
+            asyncExecutor.execute(task);
+        } catch (RejectedExecutionException e) {
+            queuedTasks.remove(task);
+            throw e;
+        }
+        return future;
+    }
+
+    /**
+     * Completes exceptionally the futures of tasks that a forced shutdown removed from the queue.
+     *
+     * @param discarded the tasks returned by {@code shutdownNow()}
+     */
+    private void failDiscarded(List<Runnable> discarded) {
+        for (Runnable task : discarded) {
+            CompletableFuture<?> future = queuedTasks.remove(task);
+            if (future != null) {
+                future.completeExceptionally(new IllegalStateException("The database cluster was closed before the work started"));
+            }
         }
     }
 
@@ -563,7 +615,10 @@ public class DatabaseCluster implements AutoCloseable {
     public <T> CompletableFuture<Void> useMapperAsync(String name, Class<T> mapperClass, Consumer<T> action) {
         lookup(sessionFactories, name);
         try {
-            return CompletableFuture.runAsync(() -> useMapper(name, mapperClass, action), asyncExecutor);
+            return submitAsync(() -> {
+                useMapper(name, mapperClass, action);
+                return null;
+            });
         } catch (RejectedExecutionException e) {
             return CompletableFuture.failedFuture(new IllegalStateException("The database cluster is closed", e));
         }
@@ -641,10 +696,10 @@ public class DatabaseCluster implements AutoCloseable {
         asyncExecutor.shutdown();
         try {
             if (!asyncExecutor.awaitTermination(CLOSE_WAIT_SECONDS, TimeUnit.SECONDS)) {
-                asyncExecutor.shutdownNow();
+                failDiscarded(asyncExecutor.shutdownNow());
             }
         } catch (InterruptedException e) {
-            asyncExecutor.shutdownNow();
+            failDiscarded(asyncExecutor.shutdownNow());
             Thread.currentThread().interrupt();
         }
         RuntimeException failure = closePools(dataSources.values());

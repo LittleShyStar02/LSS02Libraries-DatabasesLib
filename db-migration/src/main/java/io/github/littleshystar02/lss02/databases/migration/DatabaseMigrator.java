@@ -5,6 +5,7 @@ import io.github.littleshystar02.lss02.databases.cluster.DatabaseType;
 import io.github.littleshystar02.lss02.databases.migration.data.DataCopier;
 import io.github.littleshystar02.lss02.databases.migration.data.MigrationProgressListener;
 import io.github.littleshystar02.lss02.databases.migration.data.MigrationResult;
+import io.github.littleshystar02.lss02.databases.migration.data.TableCommittedException;
 import io.github.littleshystar02.lss02.databases.migration.schema.DdlGenerator;
 import io.github.littleshystar02.lss02.databases.migration.schema.DdlGeneratorFactory;
 import io.github.littleshystar02.lss02.databases.migration.schema.SchemaIntrospector;
@@ -36,7 +37,8 @@ public final class DatabaseMigrator {
      *
      * <p>Each table is created with a plain {@code CREATE TABLE}, so the call fails if a table already
      * exists on the target. If any table fails, the tables created by this call are dropped again, so the
-     * call can be retried.
+     * call can be retried. If a drop fails too, the exception message lists the tables still left on the target
+     * and the drop failures are attached as suppressed exceptions.
      *
      * @param source the database that holds the original tables
      * @param target the database that receives the new tables
@@ -61,10 +63,17 @@ public final class DatabaseMigrator {
                     created.add(table);
                 }
             } catch (SQLException | RuntimeException e) {
-                dropCreatedTables(targetConnection, ddlGenerator, created, e);
+                List<String> remaining = dropCreatedTables(targetConnection, ddlGenerator, created, e);
+                String compensation = remaining.isEmpty()
+                        ? "the tables created so far were dropped again"
+                        : "the compensation FAILED, these tables are still on the target and must be dropped"
+                                + " manually before a retry: " + remaining;
                 if (e instanceof SQLException) {
                     throw new DatabaseMigrationException("Could not create table '" + currentTable
-                            + "' on the target; the tables created so far were dropped again", e);
+                            + "' on the target; " + compensation, e);
+                }
+                if (!remaining.isEmpty()) {
+                    throw new DatabaseMigrationException(e.getMessage() + "; " + compensation, e);
                 }
                 throw (RuntimeException) e;
             }
@@ -81,16 +90,21 @@ public final class DatabaseMigrator {
      * @param ddlGenerator the dialect used to build the statements
      * @param created the tables created so far, in creation order
      * @param original the failure that aborted the migration
+     * @return the names of the tables that could not be dropped and are still on the target, empty when
+     *         the compensation fully succeeded
      */
-    private static void dropCreatedTables(Connection connection, DdlGenerator ddlGenerator,
-                                          List<TableSchema> created, Exception original) {
+    private static List<String> dropCreatedTables(Connection connection, DdlGenerator ddlGenerator,
+                                                  List<TableSchema> created, Exception original) {
+        List<String> remaining = new ArrayList<>();
         for (int i = created.size() - 1; i >= 0; i--) {
             try (Statement statement = connection.createStatement()) {
                 statement.execute(ddlGenerator.generateDropTable(created.get(i)));
             } catch (SQLException dropFailure) {
+                remaining.add(created.get(i).getName());
                 original.addSuppressed(dropFailure);
             }
         }
+        return remaining;
     }
 
     /**
@@ -157,6 +171,11 @@ public final class DatabaseMigrator {
                 try {
                     long rows = DataCopier.copy(sourceConnection, targetConnection, table, batchSize, listener, skipNonEmptyTargets);
                     result.recordTable(table.getName(), rows);
+                } catch (TableCommittedException e) {
+                    // The table is durable even though the listener failed: count it as completed.
+                    result.recordTable(e.getTableName(), e.getRowsCopied());
+                    throw new DatabaseMigrationException(e.getMessage() + "; tables already completed: "
+                            + result.getRowsCopiedPerTable().keySet(), e.getCause());
                 } catch (DatabaseMigrationException e) {
                     throw new DatabaseMigrationException(e.getMessage() + "; tables already completed: "
                             + result.getRowsCopiedPerTable().keySet(), e.getCause() != null ? e.getCause() : e);

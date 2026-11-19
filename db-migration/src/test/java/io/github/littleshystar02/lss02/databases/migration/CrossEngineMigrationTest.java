@@ -290,4 +290,29 @@ class CrossEngineMigrationTest {
                     () -> DatabaseMigrator.migrateData(source, target, List.of("n"), 0));
         }
     }
+
+    /** DB-MIG-004: tables of the same name in two schemas are not merged; location is kept. */
+    @Test
+    void sameNamedTablesInOtherSchemasAreNotMerged() throws Exception {
+        try (HikariDataSource db = h2("PostgreSQL"); Connection connection = db.getConnection();
+             Statement statement = connection.createStatement()) {
+            statement.execute("CREATE SCHEMA S1");
+            statement.execute("CREATE SCHEMA S2");
+            statement.execute("CREATE TABLE S1.ITEMS (A INT PRIMARY KEY)");
+            statement.execute("CREATE TABLE S2.ITEMS (B INT, C INT)");
+
+            statement.execute("SET SCHEMA S2");
+            TableSchema second = SchemaIntrospector.introspect(connection, "items");
+            assertEquals("S2", second.getSchema());
+            assertEquals("ITEMS", second.getName());
+            assertEquals(2, second.getColumns().size());
+            assertEquals("B", second.getColumns().get(0).getName());
+
+            statement.execute("SET SCHEMA S1");
+            TableSchema first = SchemaIntrospector.introspect(connection, "ITEMS");
+            assertEquals("S1", first.getSchema());
+            assertEquals(1, first.getColumns().size());
+            assertEquals(List.of("A"), first.getPrimaryKeyColumns());
+        }
+    }
 }

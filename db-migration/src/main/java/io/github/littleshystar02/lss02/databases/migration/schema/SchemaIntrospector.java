@@ -16,7 +16,10 @@ import java.util.TreeMap;
  *
  * <p>A table name must designate an existing table or view: it is resolved against the database
  * metadata (exact match first, then a unique case-insensitive match) before it is used anywhere else,
- * and the resolved name is the one stored in the resulting {@link TableSchema}.
+ * and the resolved catalog, schema and name are the ones stored in the resulting {@link TableSchema}.
+ * Only the connection's current schema is searched when the driver reports one; a name that still matches
+ * several tables (other case variants, or several schemas when the driver has no current schema) is
+ * rejected as ambiguous instead of merging their columns.
  */
 public final class SchemaIntrospector {
 
@@ -37,14 +40,15 @@ public final class SchemaIntrospector {
         try {
             DatabaseMetaData metaData = connection.getMetaData();
             String catalog = connection.getCatalog();
-            String resolved = resolveTableName(metaData, catalog, tableName);
+            String schema = currentSchema(connection);
+            TableRef resolved = resolveTableName(metaData, catalog, schema, tableName);
 
             List<ColumnSchema> columns = new ArrayList<>();
             // The name argument is a LIKE pattern; rows of other tables matched by wildcards are filtered out.
-            try (ResultSet resultSet = metaData.getColumns(catalog, null, resolved, null)) {
+            try (ResultSet resultSet = metaData.getColumns(resolved.catalog(), resolved.schema(), resolved.name(), null)) {
                 while (resultSet.next()) {
-                    String rowTable = resultSet.getString("TABLE_NAME");
-                    if (rowTable != null && !rowTable.equals(resolved)) {
+                    if (!resolved.matches(resultSet.getString("TABLE_CAT"), resultSet.getString("TABLE_SCHEM"),
+                            resultSet.getString("TABLE_NAME"))) {
                         continue;
                     }
                     columns.add(ColumnSchema.builder()
@@ -60,7 +64,8 @@ public final class SchemaIntrospector {
             if (columns.isEmpty()) {
                 throw new DatabaseMigrationException("Table '" + tableName + "' was not found or has no columns");
             }
-            return new TableSchema(resolved, columns, readPrimaryKey(metaData, catalog, resolved));
+            return new TableSchema(resolved.catalog(), resolved.schema(), resolved.name(), columns,
+                    readPrimaryKey(metaData, resolved));
         } catch (SQLException e) {
             throw new DatabaseMigrationException("Could not introspect table '" + tableName + "'", e);
         }
@@ -83,16 +88,34 @@ public final class SchemaIntrospector {
     }
 
     /**
-     * Finds the real name of a table in the database metadata.
+     * Reads the schema the connection currently uses, so that tables of the same name in other schemas
+     * are not mixed in.
+     *
+     * @param connection the connection
+     * @return the current schema, or {@code null} when the driver has no schema concept
+     */
+    private static String currentSchema(Connection connection) {
+        try {
+            return connection.getSchema();
+        } catch (SQLException | RuntimeException | AbstractMethodError e) {
+            return null;
+        }
+    }
+
+    /**
+     * Finds the real catalog, schema and name of a table in the database metadata.
      *
      * @param metaData the metadata of the connection
      * @param catalog the current catalog
+     * @param schema the current schema, or {@code null} to search every schema
      * @param requested the name given by the caller
-     * @return the name as the database stores it
+     * @return the table as the database stores it
      * @throws SQLException if the metadata cannot be read
-     * @throws DatabaseMigrationException if no table, or more than one case-insensitive candidate, matches
+     * @throws DatabaseMigrationException if no table matches, or the name matches several tables
+     *         (other schemas or other case variants), which is reported instead of picking one
      */
-    private static String resolveTableName(DatabaseMetaData metaData, String catalog, String requested) throws SQLException {
+    private static TableRef resolveTableName(DatabaseMetaData metaData, String catalog, String schema, String requested)
+            throws SQLException {
         if (requested == null || requested.isBlank()) {
             throw new DatabaseMigrationException("A table name must not be empty");
         }
@@ -100,47 +123,92 @@ public final class SchemaIntrospector {
         // request that differs only in case finds nothing: the second pass lists every table and
         // compares the names itself.
         for (String pattern : new String[] {requested, null}) {
-            String caseInsensitive = null;
-            int candidates = 0;
-            try (ResultSet tables = metaData.getTables(catalog, null, pattern, new String[] {"TABLE", "VIEW"})) {
+            List<TableRef> exact = new ArrayList<>();
+            List<TableRef> caseInsensitive = new ArrayList<>();
+            try (ResultSet tables = metaData.getTables(catalog, schema, pattern, new String[] {"TABLE", "VIEW"})) {
                 while (tables.next()) {
                     String name = tables.getString("TABLE_NAME");
+                    TableRef ref = new TableRef(tables.getString("TABLE_CAT"), tables.getString("TABLE_SCHEM"), name);
                     if (requested.equals(name)) {
-                        return name;
-                    }
-                    if (requested.equalsIgnoreCase(name)) {
-                        caseInsensitive = name;
-                        candidates++;
+                        exact.add(ref);
+                    } else if (requested.equalsIgnoreCase(name)) {
+                        caseInsensitive.add(ref);
                     }
                 }
             }
-            if (candidates == 1) {
-                return caseInsensitive;
+            if (exact.size() == 1) {
+                return exact.get(0);
             }
-            if (candidates > 1) {
-                break;
+            if (exact.size() > 1) {
+                throw ambiguous(requested, exact);
+            }
+            if (caseInsensitive.size() == 1) {
+                return caseInsensitive.get(0);
+            }
+            if (caseInsensitive.size() > 1) {
+                throw ambiguous(requested, caseInsensitive);
             }
         }
         throw new DatabaseMigrationException("Table '" + requested + "' was not found or has no columns");
     }
 
     /**
+     * Builds the exception for a name that designates more than one table.
+     *
+     * @param requested the name given by the caller
+     * @param candidates the tables it matches
+     * @return the exception to throw
+     */
+    private static DatabaseMigrationException ambiguous(String requested, List<TableRef> candidates) {
+        return new DatabaseMigrationException("Table name '" + requested + "' is ambiguous, it matches "
+                + candidates + "; use a connection whose current schema holds only one of them");
+    }
+
+    /**
      * Reads the primary key column names of a table in key order.
      *
      * @param metaData the metadata of the connection
-     * @param catalog the current catalog
-     * @param table the resolved table name
+     * @param table the resolved table
      * @return the key columns, empty when there is no primary key
      * @throws SQLException if the metadata cannot be read
      */
-    private static List<String> readPrimaryKey(DatabaseMetaData metaData, String catalog, String table) throws SQLException {
+    private static List<String> readPrimaryKey(DatabaseMetaData metaData, TableRef table) throws SQLException {
         TreeMap<Integer, String> ordered = new TreeMap<>();
-        try (ResultSet keys = metaData.getPrimaryKeys(catalog, null, table)) {
+        try (ResultSet keys = metaData.getPrimaryKeys(table.catalog(), table.schema(), table.name())) {
             while (keys.next()) {
                 ordered.put(keys.getInt("KEY_SEQ"), keys.getString("COLUMN_NAME"));
             }
         }
         return new ArrayList<>(ordered.values());
+    }
+
+    /**
+     * A table located by catalog, schema and name.
+     *
+     * @param catalog the catalog, or {@code null}
+     * @param schema the schema, or {@code null}
+     * @param name the table name
+     */
+    private record TableRef(String catalog, String schema, String name) {
+
+        /**
+         * Tells whether a metadata row belongs to this table; null parts reported by the driver are accepted.
+         *
+         * @param rowCatalog the catalog of the row
+         * @param rowSchema the schema of the row
+         * @param rowName the table name of the row
+         * @return {@code true} if the row is a column of this table
+         */
+        boolean matches(String rowCatalog, String rowSchema, String rowName) {
+            return (rowName == null || rowName.equals(name))
+                    && (rowSchema == null || schema == null || rowSchema.equals(schema))
+                    && (rowCatalog == null || catalog == null || rowCatalog.equals(catalog));
+        }
+
+        @Override
+        public String toString() {
+            return (catalog == null ? "" : catalog + ".") + (schema == null ? "" : schema + ".") + name;
+        }
     }
 
     /**

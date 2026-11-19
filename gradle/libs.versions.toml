@@ -1,5 +1,5 @@
 [versions]
-config-core = "0.1.3-beta.3"
+config-core = "0.1.3-beta.4"
 mybatis = "3.5.19"
 hikaricp = "7.1.0"
 slf4j = "2.0.17"

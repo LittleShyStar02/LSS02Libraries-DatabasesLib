@@ -20,16 +20,18 @@ public interface MigrationProgressListener {
     }
 
     /**
-     * Called after a batch has been inserted and committed on the target.
+     * Called after a batch has been inserted on the target; the rows are not yet committed (the table is
+     * committed once, after its last batch).
      *
      * @param tableName the table being copied
-     * @param rowCount the number of rows in the batch that was just committed
+     * @param rowCount the number of rows in the batch that was just inserted
      */
     default void onBatchCopied(String tableName, int rowCount) {
     }
 
     /**
-     * Called after the last batch of a table has been committed.
+     * Called after the table has been committed on the target (or skipped, with 0 rows). A failure here does
+     * not undo the table.
      *
      * @param tableName the table that was copied
      * @param totalRows the total number of rows copied for the table

@@ -52,10 +52,18 @@ public final class DataCopier {
     /**
      * Copies one table and reports progress.
      *
-     * <p>The target connection is switched to manual commit for the duration of the copy and its original
-     * auto-commit mode is restored afterwards, even on failure. The listener is notified when the table
-     * starts, after every written batch, when the table completes, or when an error occurs. Batch
-     * notifications are sent before the final commit, so they report rows written, not yet durable.
+     * <p>The target connection must be in auto-commit mode: a connection whose transaction is managed by
+     * the caller is rejected with a {@link DatabaseMigrationException} before anything is touched, because
+     * the copy commits or rolls back the whole connection. The connection is switched to manual commit for
+     * the duration of the copy and its auto-commit mode is restored afterwards, even on failure.
+     *
+     * <p>The listener is notified when the table starts, after every written batch, when the table
+     * completes, or when an error occurs. Batch notifications are sent before the final commit, so they
+     * report rows written, not yet durable. A runtime exception thrown by {@code onTableStarted} or
+     * {@code onBatchCopied} aborts the copy: the table is rolled back, {@code onError} is called and the
+     * exception is wrapped in a {@link DatabaseMigrationException}. {@code onTableCompleted} is called only
+     * after the commit: if it throws, the table stays committed and a {@link TableCommittedException} is
+     * thrown. An exception of {@code onError} is attached as suppressed to the original failure.
      *
      * @param source the connection to read from
      * @param target the connection to write to; the table must already exist there
@@ -86,60 +94,70 @@ public final class DataCopier {
         boolean originalTargetAutoCommit;
         try {
             originalTargetAutoCommit = target.getAutoCommit();
-            target.setAutoCommit(false);
         } catch (SQLException e) {
             throw new DatabaseMigrationException("Could not prepare the target connection for table '" + table.getName() + "'", e);
         }
+        if (!originalTargetAutoCommit) {
+            throw new DatabaseMigrationException("The target connection has a transaction managed by the caller"
+                    + " (auto-commit is off): copying table '" + table.getName() + "' would commit or roll back"
+                    + " the caller's pending work. Pass a connection in auto-commit mode; nothing was changed");
+        }
 
-        listener.onTableStarted(table.getName());
         boolean sourceAutoCommitChanged = false;
         boolean originalSourceAutoCommit = true;
         long totalRows = 0;
+        long copied;
         try {
+            target.setAutoCommit(false);
+            listener.onTableStarted(table.getName());
             if (skipIfTargetNotEmpty && hasRows(target, targetTable)) {
                 target.rollback();
-                listener.onTableCompleted(table.getName(), 0);
-                return 0;
-            }
+                copied = 0;
+            } else {
+                try (Statement selectStatement = source.createStatement()) {
+                    if (needsManualCommitForCursor(source)) {
+                        originalSourceAutoCommit = source.getAutoCommit();
+                        source.setAutoCommit(false);
+                        sourceAutoCommitChanged = true;
+                    }
+                    selectStatement.setFetchSize(fetchSizeFor(source, batchSize));
 
-            try (Statement selectStatement = source.createStatement()) {
-                if (needsManualCommitForCursor(source)) {
-                    originalSourceAutoCommit = source.getAutoCommit();
-                    source.setAutoCommit(false);
-                    sourceAutoCommitChanged = true;
-                }
-                selectStatement.setFetchSize(fetchSizeFor(source, batchSize));
+                    try (ResultSet resultSet = selectStatement.executeQuery(selectSql);
+                         PreparedStatement insertStatement = target.prepareStatement(insertSql)) {
+                        int columnCount = table.getColumns().size();
+                        int batched = 0;
+                        while (resultSet.next()) {
+                            for (int i = 0; i < columnCount; i++) {
+                                insertStatement.setObject(i + 1, readValue(resultSet, i + 1));
+                            }
+                            insertStatement.addBatch();
+                            batched++;
+                            totalRows++;
 
-                try (ResultSet resultSet = selectStatement.executeQuery(selectSql);
-                     PreparedStatement insertStatement = target.prepareStatement(insertSql)) {
-                    int columnCount = table.getColumns().size();
-                    int batched = 0;
-                    while (resultSet.next()) {
-                        for (int i = 0; i < columnCount; i++) {
-                            insertStatement.setObject(i + 1, readValue(resultSet, i + 1));
+                            if (batched >= batchSize) {
+                                insertStatement.executeBatch();
+                                listener.onBatchCopied(table.getName(), batched);
+                                batched = 0;
+                            }
                         }
-                        insertStatement.addBatch();
-                        batched++;
-                        totalRows++;
-
-                        if (batched >= batchSize) {
+                        if (batched > 0) {
                             insertStatement.executeBatch();
                             listener.onBatchCopied(table.getName(), batched);
-                            batched = 0;
                         }
                     }
-                    if (batched > 0) {
-                        insertStatement.executeBatch();
-                        listener.onBatchCopied(table.getName(), batched);
-                    }
                 }
+                target.commit();
+                copied = totalRows;
             }
-            target.commit();
-            listener.onTableCompleted(table.getName(), totalRows);
-            return totalRows;
         } catch (SQLException | RuntimeException e) {
+            // Everything up to and including commit() is inside this try, so reaching here means the
+            // table was not confirmed and the rollback below is accurate.
             rollbackQuietly(target, e);
-            listener.onError(table.getName(), e);
+            try {
+                listener.onError(table.getName(), e);
+            } catch (RuntimeException listenerFailure) {
+                e.addSuppressed(listenerFailure);
+            }
             throw new DatabaseMigrationException("Could not copy data for table '" + table.getName()
                     + "' (read " + totalRows + " rows before the failure; the target table was rolled back"
                     + " to its state before this copy)", e);
@@ -158,6 +176,13 @@ public final class DataCopier {
                 // best-effort restore; the connection is likely being closed by the caller anyway
             }
         }
+        // The table is confirmed (or skipped) here: a listener failure can no longer undo it.
+        try {
+            listener.onTableCompleted(table.getName(), copied);
+        } catch (RuntimeException listenerFailure) {
+            throw new TableCommittedException(table.getName(), copied, listenerFailure);
+        }
+        return copied;
     }
 
     /**

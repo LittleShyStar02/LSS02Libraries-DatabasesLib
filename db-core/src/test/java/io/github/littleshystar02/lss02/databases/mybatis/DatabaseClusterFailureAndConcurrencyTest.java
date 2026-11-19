@@ -186,4 +186,31 @@ class DatabaseClusterFailureAndConcurrencyTest {
         }
         verify(metrics).create(anyString(), any());
     }
+
+    /** DB-CORE-001: work discarded by a forced close completes its public future exceptionally. */
+    @Test
+    void forcedCloseFailsTheFuturesOfQueuedWork(@TempDir Path dir) throws Exception {
+        DatabaseCluster cluster = new DatabaseCluster(List.of(sqlite(dir, "main", 1)));
+        CountDownLatch running = new CountDownLatch(1);
+        CompletableFuture<Void> blocker = cluster.useMapperAsync("main", UserMapper.class, mapper -> {
+            running.countDown();
+            try {
+                Thread.sleep(20000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        assertTrue(running.await(10, TimeUnit.SECONDS));
+        CompletableFuture<Void> queued = cluster.useMapperAsync("main", UserMapper.class, mapper -> { });
+        CompletableFuture<List<User>> queuedWith = cluster.withMapperAsync("main", UserMapper.class, UserMapper::findAll);
+
+        cluster.close();
+
+        assertTrue(queued.isDone(), "a discarded task must not leave its future pending");
+        assertTrue(queued.isCompletedExceptionally());
+        assertTrue(queuedWith.isCompletedExceptionally());
+        java.util.concurrent.ExecutionException error = assertThrows(java.util.concurrent.ExecutionException.class, queued::get);
+        assertTrue(error.getCause() instanceof IllegalStateException);
+        assertTrue(blocker.isDone());
+    }
 }
